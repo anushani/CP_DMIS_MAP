@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DMIS Central Province Project Map</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 16 16%27%3E%3Crect width=%2716%27 height=%2716%27 rx=%273%27 fill=%27%231a5926%27/%3E%3C/svg%3E">
+<link rel="stylesheet" href="lib/leaflet/leaflet.css">
+<style>
+  :root{
+    --green:#1a5926; --green-d:#123f1b; --ink:#1d2a21; --muted:#5d6b61; --line:#dfe5e0;
+    --bg:#f4f7f4; --card:#ffffff; --accent:#c8791a;
+    --c0:#eef6ec; --c1:#c3e1bd; --c2:#8cc58a; --c3:#4f9c5c; --c4:#1f6b37;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{font:14px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans Sinhala","Iskoola Pota",sans-serif;color:var(--ink);background:var(--bg);display:flex;flex-direction:column}
+  header{background:var(--green);color:#fff;padding:8px 16px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+  header h1{font-size:16px;margin:0;font-weight:600;letter-spacing:.2px}
+  header small{opacity:.8;font-weight:400}
+  .controls{display:flex;gap:8px;align-items:center;margin-left:auto;flex-wrap:wrap}
+  select,input[type=search]{font:inherit;padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,.35);background:#fff;color:var(--ink)}
+  label.chk{display:flex;gap:6px;align-items:center;font-size:13px;cursor:pointer}
+  main{flex:1;min-height:0;display:flex}
+  #map{flex:1;min-width:0;background:#dfe9e2}
+  aside{width:380px;max-width:42vw;background:var(--card);border-left:1px solid var(--line);overflow:auto;padding:16px}
+  @media(max-width:800px){
+    main{flex-direction:column} #map{flex:none;height:52vh}
+    aside{width:auto;max-width:none;border-left:0;border-top:1px solid var(--line);flex:1}
+    header .controls{margin-left:0;width:100%}
+  }
+  h2{font-size:17px;margin:0 0 2px} h3{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:18px 0 6px}
+  .sub{color:var(--muted);margin-bottom:10px}
+  .kpis{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .kpi{border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+  .kpi b{display:block;font-size:18px;font-variant-numeric:tabular-nums} .kpi span{font-size:12px;color:var(--muted)}
+  .bar{display:flex;height:14px;border-radius:7px;overflow:hidden;background:#eee;margin:6px 0}
+  .bar i{display:block;height:100%}
+  .bl{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px;color:var(--muted)}
+  .bl span::before{content:"";display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px;background:var(--c)}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);text-align:left;padding:4px 6px;border-bottom:1px solid var(--line);cursor:pointer;white-space:nowrap}
+  td{padding:6px;border-bottom:1px solid var(--line);vertical-align:top} td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+  tr.row{cursor:pointer} tr.row:hover td{background:#f1f7f2}
+  .pname{font-weight:500} .pmeta{font-size:12px;color:var(--muted)}
+  .note{background:#fff7ea;border:1px solid #f0d9ae;border-radius:8px;padding:8px 10px;font-size:12.5px;color:#6a4a10;margin-top:12px}
+  button.link{background:none;border:0;color:var(--green);cursor:pointer;padding:0;font:inherit;text-decoration:underline}
+  .legend{background:rgba(255,255,255,.95);padding:8px 10px;border-radius:8px;box-shadow:0 1px 6px rgba(0,0,0,.25);line-height:1.5;font-size:12px}
+  .legend b{display:block;margin-bottom:4px}
+  .legend i{display:inline-block;width:16px;height:12px;margin-right:6px;vertical-align:-1px;border:1px solid rgba(0,0,0,.2)}
+  .leaflet-tooltip.ds-tip{font:13px/1.35 system-ui,sans-serif;border-radius:6px}
+  .dsname{font:600 11px system-ui,sans-serif;color:#102014;text-shadow:0 0 3px #fff,0 0 3px #fff;white-space:nowrap;pointer-events:none;background:none;border:0;box-shadow:none}
+  .dsname::before{display:none}
+  .distname{font-size:13px;letter-spacing:.12em;color:#12301a;opacity:.75}
+  #err{display:none;padding:16px;color:#8a1c1c}
+  .search{width:100%;border:1px solid var(--line);margin:6px 0}
+</style>
+</head>
+<body>
+<header>
+  <h1>DMIS Central Province <small>· Approved projects by Divisional Secretariat</small></h1>
+  <div class="controls">
+    <select id="metric" aria-label="Map shows"></select>
+    <select id="dsPick" aria-label="Find a DS division"><option value="">Find DS division…</option></select>
+    <label class="chk"><input type="checkbox" id="base" checked> Base map</label>
+    <label class="chk"><input type="checkbox" id="labels" checked> Labels</label>
+  </div>
+</header>
+<main>
+  <div id="map" role="application" aria-label="Map of Central Province"></div>
+  <aside id="panel" aria-live="polite"><div id="err"></div></aside>
+</main>
+
+<script src="lib/leaflet/leaflet.js"></script>
+<script>
+/* ============ SETTINGS (edit here) ============ */
+const CONFIG = {
+  boundaries : 'data/ds.geojson',
+  districts  : 'data/district.geojson',
+  stats      : 'data/stats.json',      // later: point to your live API, same JSON shape
+  projects   : 'data/projects.json',
+  refreshSeconds : 0,                  // e.g. 60 to re-fetch stats every minute (needs a live API)
+  tiles : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+  attribution : '© OpenStreetMap contributors'
+};
+const METRICS = {
+  alloc : {label:'Allocated amount (Rs.)',      get:s=>s.alloc,                           fmt:v=>money(v)},
+  count : {label:'Number of projects',          get:s=>s.count,                           fmt:v=>v.toLocaleString()},
+  wpct  : {label:'Financial progress % (weighted by Rs.)', get:s=>s.wpct,                 fmt:v=>v.toFixed(1)+'%'},
+  done  : {label:'Projects at 100% physical progress', get:s=>s.count?100*s.completed/s.count:0, fmt:v=>v.toFixed(0)+'%'}
+};
+const CATS = [['0-10','#c0392b'],['11-24','#e67e22'],['25-49','#f1c40f'],['50-74','#9bc53d'],['75-99','#4f9c5c'],['100','#1f6b37']];
+const RAMP = ['#eef6ec','#c3e1bd','#8cc58a','#4f9c5c','#1f6b37'];
+
+/* ============ helpers ============ */
+const $ = id => document.getElementById(id);
+function el(tag, attrs, ...kids){
+  const e = document.createElement(tag);
+  for (const [k,v] of Object.entries(attrs||{})) {
+    if (k==='class') e.className=v; else if (k.startsWith('on')) e[k]=v; else if (k==='style') e.style.cssText=v; else e.setAttribute(k,v);
+  }
+  kids.flat().forEach(c => e.append(c instanceof Node ? c : document.createTextNode(c ?? '')));
+  return e;
+}
+function money(v){
+  if (v>=1e9) return 'Rs. '+(v/1e9).toFixed(2)+' Bn';
+  if (v>=1e6) return 'Rs. '+(v/1e6).toFixed(1)+' M';
+  return 'Rs. '+Math.round(v).toLocaleString();
+}
+const full = v => 'Rs. '+Math.round(v).toLocaleString();
+
+/* ============ state ============ */
+let map, dsLayer, distLayer, labelLayer, baseLayer, legend;
+let stats = {}, meta = {}, projects = null, metric = 'alloc', selected = null, breaks = [];
+const layers = {};   // key -> leaflet layer
+
+/* ============ load ============ */
+async function getJSON(u){ const r = await fetch(u + (u.includes('?')?'&':'?') + 't=' + Date.now()); if(!r.ok) throw new Error(u+' → '+r.status); return r.json(); }
+
+async function init(){
+  map = L.map('map',{zoomSnap:.25,minZoom:8}).setView([7.4,80.7],9);
+  baseLayer = L.tileLayer(CONFIG.tiles,{attribution:CONFIG.attribution,maxZoom:16,opacity:.55}).addTo(map);
+  try{
+    const [ds, dist, st] = await Promise.all([getJSON(CONFIG.boundaries), getJSON(CONFIG.districts), getJSON(CONFIG.stats)]);
+    stats = st.ds; meta = st.meta;
+    buildDS(ds); buildDistricts(dist);
+    map.fitBounds(dsLayer.getBounds(),{padding:[10,10]});
+    map.setMaxBounds(dsLayer.getBounds().pad(1.2));
+  }catch(e){ const x=$('err'); x.style.display='block'; x.textContent='Could not load data: '+e.message+'. If you opened index.html by double-clicking, run a local web server instead (see README).'; return; }
+
+  Object.entries(METRICS).forEach(([k,m])=>$('metric').append(el('option',{value:k},m.label)));
+  $('metric').onchange = e => { metric = e.target.value; restyle(); };
+  [...Object.values(layers)].map(l=>l.feature.properties).sort((a,b)=>a.name.localeCompare(b.name))
+    .forEach(p=>$('dsPick').append(el('option',{value:p.key},`${p.name} (${p.district})`)));
+  $('dsPick').onchange = e => e.target.value && select(e.target.value, true);
+  $('base').onchange = e => e.target.checked ? baseLayer.addTo(map) : map.removeLayer(baseLayer);
+  $('labels').onchange = updateLabels;
+
+  restyle(); showOverview();
+  if (CONFIG.refreshSeconds>0) setInterval(refresh, CONFIG.refreshSeconds*1000);
+}
+async function refresh(){
+  try{ const st = await getJSON(CONFIG.stats); stats = st.ds; meta = st.meta; restyle(); selected ? showDS(selected) : showOverview(); }catch(e){ console.warn(e); }
+}
+
+/* ============ map layers ============ */
+function buildDS(geo){
+  dsLayer = L.geoJSON(geo,{
+    style:()=>({weight:1,color:'#fff',fillOpacity:.85,fillColor:'#ddd'}),
+    onEachFeature:(f,l)=>{
+      layers[f.properties.key]=l;
+      l.on({mouseover:()=>hover(l,true), mouseout:()=>hover(l,false), click:()=>select(f.properties.key,false)});
+      l.bindTooltip(()=>tip(f.properties),{sticky:true,className:'ds-tip'});
+    }
+  }).addTo(map);
+  labelLayer = L.layerGroup();
+  Object.values(layers).forEach(l=>{
+    const p = l.feature.properties;
+    L.marker(l.getBounds().getCenter(),{interactive:false,icon:L.divIcon({className:'dsname',html:shortName(p.name),iconSize:null})}).addTo(labelLayer);
+  });
+  labelLayer.addTo(map);
+  map.on('zoomend',updateLabels);
+}
+function updateLabels(){
+  const on = $('labels').checked, z = map.getZoom();
+  labelLayer.eachLayer(m=>{ const e=m.getElement(); if(!e) return;
+    const isDist = e.classList.contains('distname');
+    e.style.display = on && (isDist ? z<10 : z>=10) ? '' : 'none'; });
+}
+const shortName = n => n.length>18 ? n.replace(' Four Gravets & Gangawata Korale',' 4G & Gangawata').replace('Ambagamuwa ','Ambagamuwa ') : n;
+function buildDistricts(geo){
+  distLayer = L.geoJSON(geo,{interactive:false,style:()=>({weight:2.4,color:'#12301a',fill:false,opacity:.9})}).addTo(map);
+  distLayer.eachLayer(l=>L.marker(l.getBounds().getCenter(),{interactive:false,
+    icon:L.divIcon({className:'dsname distname',html:l.feature.properties.district.toUpperCase(),iconSize:null})}).addTo(labelLayer));
+  updateLabels();
+}
+function tip(p){
+  const s = stats[p.key]; const m = METRICS[metric];
+  const d = el('div',{}, el('b',{},p.name), el('div',{style:'color:#5d6b61'},p.district));
+  if(!s){ d.append(el('div',{},'No projects')); return d; }
+  d.append(el('div',{},m.label+': ', el('b',{},m.fmt(m.get(s)))), el('div',{},s.count+' projects · '+money(s.alloc)));
+  return d;
+}
+function hover(l,on){ if(selected===l.feature.properties.key) return; l.setStyle(on?{weight:3,color:'#c8791a'}:{weight:1,color:'#fff'}); if(on) l.bringToFront(); distLayer&&distLayer.bringToFront(); }
+
+function computeBreaks(){
+  const vals = Object.values(stats).map(METRICS[metric].get).filter(v=>v>0).sort((a,b)=>a-b);
+  breaks = [1,2,3,4].map(i=>vals[Math.floor(vals.length*i/5)]);       // quantiles → 5 classes
+}
+const colorFor = v => v<=0 ? '#eee' : RAMP[breaks.filter(b=>v>=b).length];
+function restyle(){
+  computeBreaks();
+  Object.entries(layers).forEach(([k,l])=>{
+    const s = stats[k]; l.setStyle({fillColor: s?colorFor(METRICS[metric].get(s)):'#eee', fillOpacity:.85});
+  });
+  if(selected) layers[selected].setStyle({weight:3.5,color:'#c8791a'});
+  drawLegend();
+}
+function drawLegend(){
+  if(legend) map.removeControl(legend);
+  legend = L.control({position:'bottomleft'});
+  legend.onAdd = ()=>{
+    const m = METRICS[metric], d = el('div',{class:'legend'}, el('b',{},m.label));
+    const edges = [0,...breaks];
+    RAMP.forEach((c,i)=>{
+      const lo = edges[i], hi = edges[i+1];
+      d.append(el('div',{}, el('i',{style:'background:'+c}), i===0?'< '+m.fmt(hi): hi===undefined?'≥ '+m.fmt(lo): m.fmt(lo)+' – '+m.fmt(hi)));
+    });
+    d.append(el('div',{}, el('i',{style:'background:#eee'}),'No data'));
+    return d;
+  };
+  legend.addTo(map);
+}
+
+/* ============ selection + panel ============ */
+function select(key, zoom){
+  if(selected && layers[selected]) layers[selected].setStyle({weight:1,color:'#fff'});
+  selected = key;
+  const l = layers[key]; l.setStyle({weight:3.5,color:'#c8791a'}); l.bringToFront(); distLayer.bringToFront();
+  if(zoom) map.fitBounds(l.getBounds(),{padding:[40,40]});
+  $('dsPick').value = key; showDS(key);
+}
+function clearSel(){
+  if(selected && layers[selected]) layers[selected].setStyle({weight:1,color:'#fff'});
+  selected = null; $('dsPick').value=''; showOverview(); map.fitBounds(dsLayer.getBounds(),{padding:[10,10]});
+}
+function put(...nodes){ const p=$('panel'); [...p.children].forEach(c=>c.id!=='err'&&c.remove()); p.append(...nodes); p.scrollTop=0; }
+const kpi = (v,l)=>el('div',{class:'kpi'},el('b',{},v),el('span',{},l));
+
+function progressBar(cats){
+  const total = Object.values(cats).reduce((a,b)=>a+b,0)||1;
+  const bar = el('div',{class:'bar',role:'img','aria-label':'Physical progress distribution'});
+  const lg = el('div',{class:'bl'});
+  CATS.forEach(([c,col])=>{
+    const n = cats[c]||0;
+    bar.append(el('i',{style:`width:${100*n/total}%;background:${col}`,title:`${c}%: ${n} projects`}));
+    lg.append(el('span',{style:'--c:'+col},`${c}%: ${n}`));
+  });
+  return [bar,lg];
+}
+
+function showOverview(){
+  const all = Object.values(stats);
+  const n = all.reduce((a,s)=>a+s.count,0), al = all.reduce((a,s)=>a+s.alloc,0), fi = all.reduce((a,s)=>a+s.fin,0);
+  const cats = {}; all.forEach(s=>CATS.forEach(([c])=>cats[c]=(cats[c]||0)+(s.cats[c]||0)));
+  const rows = {};   // by district
+  Object.values(layers).forEach(l=>{ const p=l.feature.properties, s=stats[p.key]; if(!s) return;
+    const r = rows[p.district] ||= {count:0,alloc:0,fin:0}; r.count+=s.count; r.alloc+=s.alloc; r.fin+=s.fin; });
+  const unl = meta.unlocated||{};
+  const nodes = [
+    el('h2',{},'Central Province'), el('div',{class:'sub'},'Click a DS division on the map. Data loaded '+(meta.data_date||meta.generated||'—')),
+    el('div',{class:'kpis'}, kpi(n.toLocaleString(),'projects shown on map'), kpi(money(al),'allocated'),
+      kpi(money(fi),'financial progress'), kpi((al?100*fi/al:0).toFixed(1)+'%','of allocation spent')),
+    el('h3',{},'Physical progress (projects)'), ...progressBar(cats),
+    el('h3',{},'By district'),
+    el('table',{}, el('tr',{},el('th',{},'District'),el('th',{class:'n'},'Projects'),el('th',{class:'n'},'Allocated'),el('th',{class:'n'},'Spent')),
+      Object.entries(rows).sort().map(([d,r])=>el('tr',{},el('td',{},d),el('td',{class:'n'},r.count),el('td',{class:'n'},money(r.alloc)),el('td',{class:'n'},(r.alloc?100*r.fin/r.alloc:0).toFixed(1)+'%'))))
+  ];
+  const nu = meta.total_projects - meta.mapped_projects;
+  if(nu>0) nodes.push(el('div',{class:'note'},
+    `${nu.toLocaleString()} of ${meta.total_projects.toLocaleString()} projects (${money(meta.total_alloc-meta.mapped_alloc)}) are not on the map because they have no single DS division (provincial/district-wide or spanning several DS). `,
+    'Unlocated by district: '+Object.entries(unl).map(([d,u])=>`${d} ${u.count}`).join(', ')+'.'));
+  put(...nodes);
+}
+
+async function showDS(key){
+  const f = layers[key].feature.properties, s = stats[key];
+  const back = el('button',{class:'link',onclick:clearSel},'← Province overview');
+  if(!s){ put(back, el('h2',{},f.name), el('div',{class:'sub'},f.district+' district'), el('p',{},'No projects recorded.')); return; }
+  put(back, el('h2',{},f.name+' DS'), el('div',{class:'sub'},f.district+' district'),
+    el('div',{class:'kpis'}, kpi(s.count.toLocaleString(),'projects'), kpi(money(s.alloc),'allocated'),
+      kpi(money(s.fin),'financial progress'), kpi(s.wpct.toFixed(1)+'%','of allocation spent')),
+    el('h3',{},'Physical progress (projects)'), ...progressBar(s.cats),
+    el('h3',{},'Projects'), el('div',{id:'plist'},'Loading…'));
+  try{ projects ||= await getJSON(CONFIG.projects); }catch(e){ $('plist').textContent='Could not load project list.'; return; }
+  if(selected!==key) return;
+  projectTable(projects[key]||[]);
+}
+
+function projectTable(list){
+  let sort='alloc', dir=-1, q='';
+  const box = $('plist'); box.textContent='';
+  const search = el('input',{type:'search',class:'search',placeholder:'Search project name, code, agency…',
+    oninput:e=>{q=e.target.value.toLowerCase();draw();}});
+  const tbl = el('div',{}); box.append(search,tbl);
+  const catColor = Object.fromEntries(CATS);
+  function draw(){
+    const rows = list.filter(r=>!q||(r[0]+r[1]+r[2]+r[3]).toLowerCase().includes(q))
+      .sort((a,b)=> sort==='alloc'?dir*(a[4]-b[4]) : sort==='pct'?dir*(a[6]-b[6]) : dir*String(a[1]).localeCompare(String(b[1])));
+    const th=(t,k,c)=>el('th',{class:c||'',onclick:()=>{dir=sort===k?-dir:-1;sort=k;draw();}},t+(sort===k?(dir<0?' ▾':' ▴'):''));
+    const shown = rows.slice(0,100);
+    tbl.textContent=''; tbl.append(
+      el('table',{}, el('tr',{},th('Project','name'),th('Rs.','alloc','n'),th('Fin.%','pct','n')),
+        shown.map(r=>el('tr',{title:`${r[0]}\n${r[2]}\n${r[3]}\nSpent ${full(r[5])}\n${r[8]} → ${r[9]}`},
+          el('td',{}, el('div',{class:'pname'},r[1]), el('div',{class:'pmeta'},r[2]+' · '+r[3])),
+          el('td',{class:'n'},money(r[4])),
+          el('td',{class:'n'}, r[6].toFixed(0)+'%', el('div',{style:`height:4px;border-radius:2px;margin-top:3px;background:${catColor[r[7]]||'#ccc'}`,title:'Physical progress '+r[7]+'%'}))))),
+      el('div',{class:'pmeta',style:'margin-top:6px'}, `${rows.length} project${rows.length===1?'':'s'}`+(rows.length>shown.length?` (showing first ${shown.length}; use search)`:'')+'. Bar colour = physical progress band.'));
+  }
+  draw();
+}
+
+init();
+</script>
+</body>
+</html>
