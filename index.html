@@ -150,7 +150,7 @@ function buildDS(geo){
     onEachFeature:(f,l)=>{
       layers[f.properties.key]=l;
       l.on({mouseover:()=>hover(l,true), mouseout:()=>hover(l,false), click:()=>select(f.properties.key,false)});
-      l.bindPopup(()=>tip(f.properties),{className:'ds-tip',closeButton:true,autoPan:false});
+      l.bindTooltip(()=>tip(f.properties),{sticky:true,className:'ds-tip'});
     }
   }).addTo(map);
   labelLayer = L.layerGroup();
